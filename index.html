@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoTrack — Мониторинг воздуха</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-stone-50 text-stone-800 font-sans min-h-screen flex flex-col">
+
+    <!-- Шапка -->
+    <header class="bg-emerald-700 text-white p-4 shadow-md">
+        <div class="container mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-3">
+                <span class="bg-emerald-900 px-3 py-1 rounded-lg font-bold text-lg shadow-inner">З</span>
+                <h1 class="text-xl font-bold tracking-wide">EcoTrack // ЭкоМонитор</h1>
+            </div>
+            <div class="text-sm text-emerald-200 hidden md:block">Приоритет НТР: Экология и Климат</div>
+        </div>
+    </header>
+
+    <!-- Основной контент -->
+    <main class="container mx-auto p-4 flex-grow flex flex-col items-center justify-center">
+        
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden border border-stone-200">
+            <!-- Верхняя часть карточки: Статус и кнопка -->
+            <div class="bg-stone-100 p-6 border-b border-stone-200 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-stone-700">Качество воздуха онлайн</h2>
+                    <p id="location-text" class="text-stone-500 text-sm mt-1">Ожидание геоданных...</p>
+                </div>
+                <button onclick="initApp()" id="refresh-btn" class="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-lg font-semibold transition shadow-md flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    Обновить данные
+                </button>
+            </div>
+
+            <!-- Данные мониторинга -->
+            <div class="p-6 md:p-8">
+                
+                <!-- Главный индекс (AQI) -->
+                <div class="flex flex-col items-center text-center mb-8">
+                    <h3 class="text-stone-400 font-semibold uppercase tracking-wider text-sm mb-2">Европейский индекс AQI</h3>
+                    <div id="aqi-circle" class="w-40 h-40 rounded-full bg-stone-100 border-8 border-stone-200 flex items-center justify-center mb-4 transition-colors duration-500">
+                        <span id="aqi-value" class="text-5xl font-black text-stone-700">-</span>
+                    </div>
+                    <div id="aqi-status" class="text-xl font-bold text-stone-600">Нажмите «Обновить»</div>
+                    <p id="aqi-desc" class="text-sm text-stone-500 max-w-md mt-2">Индекс качества воздуха. Чем ниже значение, тем чище воздух.</p>
+                </div>
+
+                <!-- Подробные метрики -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <!-- PM10 -->
+                    <div class="bg-stone-50 p-4 rounded-xl border border-stone-200 text-center">
+                        <div class="text-xs text-stone-400 font-bold mb-1">Пыль (PM10)</div>
+                        <div class="text-xl font-bold text-stone-700"><span id="val-pm10">-</span> <span class="text-xs text-stone-500 font-normal">μg/m³</span></div>
+                    </div>
+                    <!-- PM2.5 -->
+                    <div class="bg-stone-50 p-4 rounded-xl border border-stone-200 text-center">
+                        <div class="text-xs text-stone-400 font-bold mb-1">Микропыль (PM2.5)</div>
+                        <div class="text-xl font-bold text-stone-700"><span id="val-pm25">-</span> <span class="text-xs text-stone-500 font-normal">μg/m³</span></div>
+                    </div>
+                    <!-- NO2 -->
+                    <div class="bg-stone-50 p-4 rounded-xl border border-stone-200 text-center">
+                        <div class="text-xs text-stone-400 font-bold mb-1">Диоксид азота</div>
+                        <div class="text-xl font-bold text-stone-700"><span id="val-no2">-</span> <span class="text-xs text-stone-500 font-normal">μg/m³</span></div>
+                    </div>
+                    <!-- Угарный газ (CO) -->
+                    <div class="bg-stone-50 p-4 rounded-xl border border-stone-200 text-center">
+                        <div class="text-xs text-stone-400 font-bold mb-1">Угарный газ (CO)</div>
+                        <div class="text-xl font-bold text-stone-700"><span id="val-co">-</span> <span class="text-xs text-stone-500 font-normal">μg/m³</span></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="text-center p-4 text-stone-400 text-xs">
+        Data provided by Open-Meteo Air Quality API | Проект НТР 
+    </footer>
+
+    <!-- Логика приложения (Реальные запросы к API) -->
+    <script>
+        // Функция запускается при нажатии на кнопку
+        function initApp() {
+            const btn = document.getElementById('refresh-btn');
+            const locText = document.getElementById('location-text');
+            
+            btn.innerHTML = 'Загрузка...';
+            btn.disabled = true;
+            locText.innerText = 'Определение координат...';
+
+            // Запрашиваем геопозицию
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        const lat = position.coords.latitude;
+                        const lon = position.coords.longitude;
+                        locText.innerText = `Широта: ${lat.toFixed(2)}, Долгота: ${lon.toFixed(2)}`;
+                        fetchAirQuality(lat, lon);
+                    },
+                    (error) => {
+                        // Если пользователь запретил доступ, берем Москву по умолчанию
+                        locText.innerText = 'Доступ запрещен. Показаны данные для Москвы.';
+                        fetchAirQuality(55.75, 37.61);
+                    }
+                );
+            } else {
+                locText.innerText = 'Геолокация не поддерживается.';
+                fetchAirQuality(55.75, 37.61);
+            }
+        }
+
+        // Запрос реальных данных
+        async function fetchAirQuality(lat, lon) {
+            // URL публичного API (без ключей)
+            const url = `https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&current=european_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide`;
+            
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                updateUI(data.current);
+            } catch (err) {
+                alert('Ошибка получения данных от сервера!');
+                console.error(err);
+            } finally {
+                const btn = document.getElementById('refresh-btn');
+                btn.innerHTML = 'Обновить данные';
+                btn.disabled = false;
+            }
+        }
+
+        // Обновление интерфейса
+        function updateUI(current) {
+            const aqi = current.european_aqi;
+            
+            // Записываем значения в карточки
+            document.getElementById('aqi-value').innerText = aqi;
+            document.getElementById('val-pm10').innerText = current.pm10;
+            document.getElementById('val-pm25').innerText = current.pm2_5;
+            document.getElementById('val-no2').innerText = current.nitrogen_dioxide;
+            document.getElementById('val-co').innerText = current.carbon_monoxide;
+
+            // Раскрашиваем главный круг в зависимости от качества воздуха
+            const circle = document.getElementById('aqi-circle');
+            const statusBox = document.getElementById('aqi-status');
+            const descBox = document.getElementById('aqi-desc');
+
+            circle.className = "w-40 h-40 rounded-full flex items-center justify-center mb-4 transition-all duration-500 border-8";
+
+            if (aqi <= 20) {
+                circle.classList.add('bg-emerald-100', 'border-emerald-400', 'text-emerald-700');
+                statusBox.innerText = 'Отличное';
+                statusBox.className = 'text-xl font-bold text-emerald-600';
+                descBox.innerText = 'Воздух чистый, идеально для прогулок и спорта на улице.';
+            } else if (aqi <= 40) {
+                circle.classList.add('bg-blue-100', 'border-blue-400', 'text-blue-700');
+                statusBox.innerText = 'Хорошее';
+                statusBox.className = 'text-xl font-bold text-blue-600';
+                descBox.innerText = 'Качество воздуха удовлетворительное.';
+            } else if (aqi <= 60) {
+                circle.classList.add('bg-yellow-100', 'border-yellow-400', 'text-yellow-700');
+                statusBox.innerText = 'Среднее';
+                statusBox.className = 'text-xl font-bold text-yellow-600';
+                descBox.innerText = 'Чувствительным людям стоит ограничить время на улице.';
+            } else {
+                circle.classList.add('bg-rose-100', 'border-rose-400', 'text-rose-700');
+                statusBox.innerText = 'Плохое';
+                statusBox.className = 'text-xl font-bold text-rose-600';
+                descBox.innerText = 'Высокий уровень загрязнения. Рекомендуется закрыть окна.';
+            }
+        }
+    </script>
+</body>
+</html>
